@@ -1,0 +1,590 @@
+pcall(function() setrobloxinput(true) end)
+
+  local Players = game:GetService("Players")
+  local ReplicatedStorage = game:GetService("ReplicatedStorage")
+  local Workspace = game:GetService("Workspace")
+
+  local lp = Players.LocalPlayer
+
+  local CONFIG = {
+      master = true,
+      autoUpgrade = false,
+      autoRebirth = false,
+      autoClaims = false,
+      autoLock = false,
+      autoMerge = false,
+
+      upgradeDelay = 20,
+      rebirthDelay = 20,
+      claimDelay = 8,
+      lockDelay = 8,
+      mergeDelay = 1.5,
+
+      restCFrame = CFrame.new(403.90, 16.59, 252.84, -1, 0, -0.05, 0, 1, 0, 0.05, 0, -1),
+      useDropButtonForMerge = false
+  }
+
+  local state = {
+      busy = {},
+      last = {
+          upgrade = 0,
+          rebirth = 0,
+          claim = 0,
+          lock = 0,
+          merge = 0,
+          popup = 0
+      },
+      base = nil
+  }
+
+  local function safe(fn)
+      local ok, result = pcall(fn)
+      if ok then return result end
+      return nil
+  end
+
+  local function notify2(title, msg)
+      pcall(function()
+          if notify then notify(title or "Matcha", msg or "", 3) end
+      end)
+  end
+
+  local function child(parent, name)
+      if not parent then return nil end
+      return safe(function() return parent:FindFirstChild(name) end)
+  end
+
+  local function getHRP()
+      local char = lp and lp.Character
+      return char and child(char, "HumanoidRootPart")
+  end
+
+  local function getText(obj)
+      if not obj then return nil end
+      return safe(function() return obj.Text end)
+  end
+
+  local function getBase()
+      local bases = Workspace:FindFirstChild("Bases")
+      if not bases then return nil end
+
+      for _, base in ipairs(bases:GetChildren()) do
+          local floor = child(base, "Floor")
+          local gui = floor and child(floor, "BillboardGui")
+          local label = gui and child(gui, "TextLabel")
+
+          if label and getText(label) == lp.Name then
+              return base
+          end
+      end
+
+      return bases:FindFirstChild("Base5")
+  end
+
+  local function refreshBase()
+      if not state.base or not state.base.Parent then
+          state.base = getBase()
+      end
+      return state.base
+  end
+
+  local function getNukeRoot(nuke)
+      if not nuke then return nil end
+
+      return nuke.PrimaryPart
+          or child(nuke, "Hitbox")
+          or child(nuke, "Main")
+          or nuke:FindFirstChildWhichIsA("BasePart")
+  end
+
+  local function getNukeLabel(nuke)
+      local overhead = child(nuke, "OverheadNuke")
+      local label = overhead and child(overhead, "TextLabel")
+      local text = getText(label)
+
+      if text and text ~= "" then return text end
+
+      local tier = safe(function() return nuke:GetAttribute("Tier") end)
+      if tier ~= nil then return "Tier:" .. tostring(tier) end
+
+      return nuke and nuke.Name or "Unknown"
+  end
+
+  local function runJob(name, fn)
+      if state.busy[name] then return end
+      state.busy[name] = true
+
+      task.spawn(function()
+          pcall(fn)
+          state.busy[name] = false
+      end)
+
+      task.delay(10, function()
+          state.busy[name] = false
+      end)
+  end
+
+  local NukeRemotes = ReplicatedStorage:FindFirstChild("NukeRemotes")
+  local Packages = ReplicatedStorage:FindFirstChild("Packages")
+  local Networking = Packages
+      and Packages:FindFirstChild("Remotes")
+      and Packages.Remotes:FindFirstChild("Networking")
+
+  local PurchaseUpgrade = NukeRemotes and NukeRemotes:FindFirstChild("PurchaseUpgrade")
+  local RequestRebirth = NukeRemotes and NukeRemotes:FindFirstChild("RequestRebirth")
+  local RequestLockBase = NukeRemotes and NukeRemotes:FindFirstChild("RequestLockBase")
+  local DropRemote1 = NukeRemotes and NukeRemotes:FindFirstChild("Drop")
+  local DropRemote2 = Networking and Networking:FindFirstChild("RE/Pickup/Drop")
+
+  local ClaimAllSeasonQuests = Networking and Networking:FindFirstChild("RF/Season/ClaimAllSeasonQuests")
+  local ClaimSeasonLogin = Networking and Networking:FindFirstChild("RF/Season/ClaimSeasonLogin")
+  local ClaimSeasonPass = Networking and Networking:FindFirstChild("RF/Season/ClaimSeasonPass")
+
+  local function autoUpgrade()
+      if not PurchaseUpgrade then return end
+
+      local ids = {
+          "TIER", "MAX", "LOCKBASE",
+          "Tier", "Max", "LockBase",
+          1, 2, 3
+      }
+
+      for _, id in ipairs(ids) do
+          pcall(function()
+              PurchaseUpgrade:FireServer(id)
+          end)
+          task.wait(0.08)
+      end
+  end
+
+  local function autoRebirth()
+      if not RequestRebirth then return end
+
+      pcall(function()
+          RequestRebirth:FireServer()
+      end)
+
+      task.wait(0.1)
+
+      pcall(function()
+          RequestRebirth:FireServer(true)
+      end)
+
+      task.wait(0.1)
+
+      pcall(function()
+          RequestRebirth:FireServer(1)
+      end)
+  end
+
+  local function autoClaims()
+      for _, remote in ipairs({
+          ClaimAllSeasonQuests,
+          ClaimSeasonLogin,
+          ClaimSeasonPass
+      }) do
+          if remote then
+              pcall(function()
+                  remote:InvokeServer()
+              end)
+              task.wait(0.12)
+          end
+      end
+  end
+
+  local function autoLock()
+      if RequestLockBase then
+          pcall(function()
+              RequestLockBase:FireServer()
+          end)
+      end
+  end
+
+  local function dropHeldNuke()
+      pcall(function()
+          if DropRemote1 then DropRemote1:FireServer() end
+      end)
+
+      pcall(function()
+          if DropRemote2 then DropRemote2:FireServer() end
+      end)
+
+      if not CONFIG.useDropButtonForMerge then return end
+
+      local gui = lp:FindFirstChild("PlayerGui")
+      local screen = gui and gui:FindFirstChild("ScreenGui")
+      local holding = screen and screen:FindFirstChild("HoldingFrame")
+      local drop = holding and holding:FindFirstChild("Drop")
+      local btn = drop and drop:FindFirstChild("TextButton")
+
+      if btn then
+          pcall(function()
+              local pos = btn.AbsolutePosition
+              local size = btn.AbsoluteSize
+              mousemoveabs(pos.X + size.X / 2, pos.Y + size.Y / 2)
+              task.wait(0.05)
+              mouse1click()
+          end)
+      end
+  end
+
+  local function scanMergePairs()
+      local base = refreshBase()
+      local folder = base and base:FindFirstChild("Nukes")
+      if not folder then return {} end
+
+      local groups = {}
+
+      for _, nuke in ipairs(folder:GetChildren()) do
+          local root = getNukeRoot(nuke)
+
+          if root then
+              local key = getNukeLabel(nuke)
+              groups[key] = groups[key] or {}
+
+              groups[key][#groups[key] + 1] = {
+                  model = nuke,
+                  root = root,
+                  pos = root.Position
+              }
+          end
+      end
+
+      return groups
+  end
+
+  local function countGroup(key)
+      local groups = scanMergePairs()
+      local list = groups[key]
+      return list and #list or 0
+  end
+
+  local function getBestPair()
+      local hrp = getHRP()
+      local groups = scanMergePairs()
+      local bestKey, bestA, bestB, bestDist
+
+      for key, list in pairs(groups) do
+          if #list >= 2 then
+              table.sort(list, function(a, b)
+                  if not hrp then return false end
+                  return (a.pos - hrp.Position).Magnitude < (b.pos - hrp.Position).Magnitude
+              end)
+
+              for i = 1, #list - 1 do
+                  local a = list[i]
+                  local b = list[i + 1]
+                  local dist = hrp and ((a.pos - hrp.Position).Magnitude + (b.pos - hrp.Position).Magnitude) or 0
+
+                  if not bestDist or dist < bestDist then
+                      bestDist = dist
+                      bestKey = key
+                      bestA = a
+                      bestB = b
+                  end
+              end
+          end
+      end
+
+      return bestKey, bestA, bestB
+  end
+
+  local function touchNuke(item, duration)
+      local hrp = getHRP()
+      if not hrp or not item or not item.root then return false end
+
+      local started = tick()
+
+      while tick() - started < duration do
+          if not CONFIG.master or not CONFIG.autoMerge then return false end
+          if not item.root.Parent then return false end
+
+          local pos = item.root.Position
+
+          pcall(function()
+              hrp.CFrame = CFrame.new(pos.X, pos.Y + 1.8, pos.Z)
+          end)
+
+          task.wait(0.08)
+      end
+
+      return true
+  end
+
+  local function returnToRest()
+      local hrp = getHRP()
+      if not hrp then return end
+
+      pcall(function()
+          hrp.CFrame = CONFIG.restCFrame
+      end)
+  end
+
+  local function mergeOnePair()
+      local key, first, second = getBestPair()
+      if not key or not first or not second then
+          return false
+      end
+
+      local before = countGroup(key)
+
+      dropHeldNuke()
+      task.wait(0.2)
+
+      touchNuke(first, 0.45)
+      task.wait(0.15)
+
+      touchNuke(second, 0.85)
+      task.wait(0.25)
+
+      returnToRest()
+      task.wait(0.35)
+
+      dropHeldNuke()
+      task.wait(0.25)
+
+      local after = countGroup(key)
+      if after < before then
+          return true
+      end
+
+      key, first, second = getBestPair()
+      if not key or not first or not second then
+          return false
+      end
+
+      before = countGroup(key)
+
+      dropHeldNuke()
+      task.wait(0.35)
+
+      touchNuke(first, 0.75)
+      task.wait(0.25)
+
+      touchNuke(second, 1.15)
+      task.wait(0.35)
+
+      returnToRest()
+      task.wait(0.45)
+
+      dropHeldNuke()
+      task.wait(0.35)
+
+      after = countGroup(key)
+      return after < before
+  end
+
+  local function autoMerge()
+      local passes = 0
+
+      while CONFIG.master and CONFIG.autoMerge and passes < 8 do
+          passes = passes + 1
+
+          local merged = mergeOnePair()
+          if not merged then
+              break
+          end
+
+          task.wait(0.4)
+      end
+
+      returnToRest()
+  end
+
+  local function hidePopups()
+      local gui = lp and lp:FindFirstChild("PlayerGui")
+      if not gui then return end
+
+      local targets = {
+          gui:FindFirstChild("Notification"),
+          gui:FindFirstChild("UniversalPopups")
+      }
+
+      local screen = gui:FindFirstChild("ScreenGui")
+      if screen then
+          targets[#targets + 1] = screen:FindFirstChild("Notification")
+          targets[#targets + 1] = screen:FindFirstChild("Notifications")
+      end
+
+      for _, obj in ipairs(targets) do
+          if obj then
+              pcall(function() obj.Enabled = false end)
+              pcall(function() obj.Visible = false end)
+
+              for _, d in ipairs(obj:GetDescendants()) do
+                  local text = getText(d)
+
+                  if text then
+                      local lower = string.lower(text)
+
+                      if string.find(lower, "not enough")
+                          or string.find(lower, "cash")
+                          or string.find(lower, "money")
+                      then
+                          pcall(function() d.Visible = false end)
+                          pcall(function()
+                              if d.Parent then d.Parent.Visible = false end
+                          end)
+                      end
+                  end
+              end
+          end
+      end
+
+      local universal = gui:FindFirstChild("UniversalPopups")
+      local promptFrame = universal and universal:FindFirstChild("PromptFrame")
+
+      if promptFrame then
+          pcall(function() promptFrame.Visible = false end)
+      end
+  end
+
+  local function loadUI()
+      local Lib
+
+      pcall(function()
+          local src = httpget("https://raw.githubusercontent.com/neaxusxgod-png/INS-ui/main/uilib.min.lua")
+          Lib = loadstring(src)()
+      end)
+
+      if not Lib and INSUI then
+          Lib = INSUI
+      end
+
+      if not Lib or not Lib.CreateWindow then
+          notify2("Merge a Nuke", "INSUI failed to load. Automation still running.")
+          return nil
+      end
+
+      local win = Lib:CreateWindow({
+          title = "Merge a Nuke",
+          subtitle = "Matcha automation",
+          size = Vector2.new(500, 420),
+          menuKey = "p",
+          smartFps = false,
+          checkboxStyle = true,
+          opacity = 98
+      })
+
+      pcall(function() win:AddSettingsTab("gear") end)
+      pcall(function() Lib:Category("AUTO") end)
+
+      local tab = win:Tab("Automation", "zap")
+      local main = tab:Section("Main", "Left", "Core toggles")
+      local timing = tab:Section("Timing", "Right", "Delays")
+      local tools = tab:Section("Tools", "Right", "Extra")
+
+      main:Toggle("Master", CONFIG.master, function(v)
+          CONFIG.master = v
+      end):AddKeybind("m", "Toggle")
+
+      main:Toggle("Auto upgrades", CONFIG.autoUpgrade, function(v)
+          CONFIG.autoUpgrade = v
+          state.last.upgrade = 0
+      end):AddKeybind("u", "Toggle")
+
+      main:Toggle("Auto rebirth", CONFIG.autoRebirth, function(v)
+          CONFIG.autoRebirth = v
+          state.last.rebirth = 0
+          if v then runJob("rebirth", autoRebirth) end
+      end):AddKeybind("r", "Toggle")
+
+      main:Toggle("Auto claims", CONFIG.autoClaims, function(v)
+          CONFIG.autoClaims = v
+          state.last.claim = 0
+      end):AddKeybind("c", "Toggle")
+
+      main:Toggle("Auto lock", CONFIG.autoLock, function(v)
+          CONFIG.autoLock = v
+          state.last.lock = 0
+          if v then runJob("lock", autoLock) end
+      end):AddKeybind("l", "Toggle")
+
+      main:Toggle("Auto merge", CONFIG.autoMerge, function(v)
+          CONFIG.autoMerge = v
+          state.last.merge = 0
+      end):AddKeybind("n", "Toggle")
+
+      timing:Slider("Upgrade delay", CONFIG.upgradeDelay, 1, 5, 60, "s", function(v)
+          CONFIG.upgradeDelay = v
+      end)
+
+      timing:Slider("Rebirth delay", CONFIG.rebirthDelay, 1, 5, 120, "s", function(v)
+          CONFIG.rebirthDelay = v
+      end)
+
+      timing:Slider("Claim delay", CONFIG.claimDelay, 1, 3, 60, "s", function(v)
+          CONFIG.claimDelay = v
+      end)
+
+      timing:Slider("Lock delay", CONFIG.lockDelay, 1, 1, 30, "s", function(v)
+          CONFIG.lockDelay = v
+      end)
+
+      timing:Slider("Merge delay", CONFIG.mergeDelay, 0.5, 0.5, 15, "s", function(v)
+          CONFIG.mergeDelay = v
+      end)
+
+      tools:Toggle("Use drop button for merge", CONFIG.useDropButtonForMerge, function(v)
+          CONFIG.useDropButtonForMerge = v
+      end)
+
+      tools:Button("Refresh base", function()
+          state.base = getBase()
+          notify2("Base", state.base and state.base.Name or "Not found")
+      end):AddButton("Merge once", function()
+          runJob("merge", autoMerge)
+      end)
+
+      tools:Label(function()
+          local base = refreshBase()
+          return "Base: " .. (base and base.Name or "none")
+      end)
+
+      return Lib
+  end
+
+  local Lib = loadUI()
+  state.base = getBase()
+
+  task.spawn(function()
+      while true do
+          local now = tick()
+
+          if now - state.last.popup >= 0.35 then
+              state.last.popup = now
+              pcall(hidePopups)
+          end
+
+          if CONFIG.master then
+              if CONFIG.autoUpgrade and now - state.last.upgrade >= CONFIG.upgradeDelay then
+                  state.last.upgrade = now
+                  runJob("upgrade", autoUpgrade)
+              end
+
+              if CONFIG.autoRebirth and now - state.last.rebirth >= CONFIG.rebirthDelay then
+                  state.last.rebirth = now
+                  runJob("rebirth", autoRebirth)
+              end
+
+              if CONFIG.autoClaims and now - state.last.claim >= CONFIG.claimDelay then
+                  state.last.claim = now
+                  runJob("claim", autoClaims)
+              end
+
+              if CONFIG.autoLock and now - state.last.lock >= CONFIG.lockDelay then
+                  state.last.lock = now
+                  runJob("lock", autoLock)
+              end
+
+              if CONFIG.autoMerge and now - state.last.merge >= CONFIG.mergeDelay then
+                  state.last.merge = now
+                  runJob("merge", autoMerge)
+              end
+          end
+
+          task.wait(0.1)
+      end
+  end)
+
+  notify2("Merge a Nuke", "Automation loaded")
