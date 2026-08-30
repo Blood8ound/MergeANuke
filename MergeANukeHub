@@ -97,7 +97,13 @@ pcall(function() setrobloxinput(true) end)
       if current then
           state.base = current
       elseif state.base and state.base.Parent then
-          return state.base
+          local cachedOwner = safe(function()
+              return state.base:GetAttribute("OwnerUserId")
+          end)
+          if tonumber(cachedOwner) == lp.UserId then
+              return state.base
+          end
+          state.base = nil
       end
 
       return state.base
@@ -156,9 +162,9 @@ pcall(function() setrobloxinput(true) end)
   local DropRemote1 = NukeRemotes and NukeRemotes:FindFirstChild("Drop")
   local DropRemote2 = Networking and Networking:FindFirstChild("RE/Pickup/Drop")
 
-  local ClaimAllSeasonQuests = Networking and Networking:FindFirstChild("RF/Season/ClaimAllSeasonQuests")
-  local ClaimSeasonLogin = Networking and Networking:FindFirstChild("RF/Season/ClaimSeasonLogin")
-  local ClaimSeasonPass = Networking and Networking:FindFirstChild("RF/Season/ClaimSeasonPass")
+  local ClaimAllSeasonQuests = Networking and Networking:FindFirstChild("RF/ClaimAllSeasonQuests")
+  local ClaimSeasonLogin = Networking and Networking:FindFirstChild("RF/ClaimSeasonLogin")
+  local ClaimSeasonPass = Networking and Networking:FindFirstChild("RF/ClaimSeasonPass")
 
   local function autoUpgrade()
       if not PurchaseUpgrade then return end
@@ -169,7 +175,7 @@ pcall(function() setrobloxinput(true) end)
           if not CONFIG.master or not CONFIG.autoUpgrade then return end
 
           pcall(function()
-              PurchaseUpgrade:FireServer(id)
+              PurchaseUpgrade:FireServer(id, "cash")
           end)
 
           task.wait(0.85)
