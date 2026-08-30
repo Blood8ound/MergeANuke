@@ -203,20 +203,63 @@ pcall(function() setrobloxinput(true) end)
       return nil
   end
 
+  local function getUpgradeContainer()
+      local gui = lp and lp:FindFirstChild("PlayerGui")
+      local screen = gui and gui:FindFirstChild("ScreenGui")
+      local frames = screen and screen:FindFirstChild("Frames")
+      local upgrades = frames and frames:FindFirstChild("UpgradesFrame")
+      local content = upgrades and upgrades:FindFirstChild("Content")
+      return content and content:FindFirstChild("Container")
+  end
+
+  local function getUpgradeRowText(rowName)
+      local container = getUpgradeContainer()
+      local row = container and container:FindFirstChild(rowName)
+      local level = row and row:FindFirstChild("LevelAmnt")
+      local buy = row and row:FindFirstChild("BuyOptions")
+      local upgrade = buy and buy:FindFirstChild("Upgrade")
+      local price = upgrade and upgrade:FindFirstChild("Price")
+
+      return tostring(getText(level) or "") .. "|" .. tostring(getText(price) or "")
+  end
+
+  local function waitForUpgradeChange(rowName, before, timeout)
+      local started = tick()
+
+      while tick() - started < timeout do
+          local current = getUpgradeRowText(rowName)
+
+          if current ~= before and current ~= "|" then
+              return true
+          end
+
+          task.wait(0.35)
+      end
+
+      return false
+  end
+
   local function autoUpgrade()
       local PurchaseUpgrade = getNukeRemote("PurchaseUpgrade")
       if not PurchaseUpgrade then return end
 
-      local ids = { "MAX", "LOCKBASE", "TIER" }
+      local upgrades = {
+          { id = "TIER", row = "Tier" },
+          { id = "MAX", row = "Max" },
+          { id = "LOCKBASE", row = "LockBase" }
+      }
 
-      for _, id in ipairs(ids) do
+      for _, upgrade in ipairs(upgrades) do
           if not CONFIG.master or not CONFIG.autoUpgrade then return end
 
+          local before = getUpgradeRowText(upgrade.row)
+
           pcall(function()
-              PurchaseUpgrade:FireServer(id, "cash")
+              PurchaseUpgrade:FireServer(upgrade.id, "cash")
           end)
 
-          task.wait(0.85)
+          waitForUpgradeChange(upgrade.row, before, 7)
+          task.wait(0.4)
       end
   end
 
@@ -260,9 +303,15 @@ pcall(function() setrobloxinput(true) end)
   local function autoLock()
       local RequestLockBase = getNukeRemote("RequestLockBase")
       if RequestLockBase then
-          pcall(function()
-              RequestLockBase:FireServer()
-          end)
+          for _ = 1, 2 do
+              if not CONFIG.master or not CONFIG.autoLock then return end
+
+              pcall(function()
+                  RequestLockBase:FireServer()
+              end)
+
+              task.wait(0.75)
+          end
       end
   end
 
