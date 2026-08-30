@@ -20,7 +20,7 @@ pcall(function() setrobloxinput(true) end)
       lockDelay = 8,
       mergeDelay = 1.5,
 
-      restCFrame = CFrame.new(403.90, 16.59, 252.84, -1, 0, -0.05, 0, 1, 0, 0.05, 0, -1),
+      restCFrame = nil,
       useDropButtonForMerge = false
   }
 
@@ -69,6 +69,13 @@ pcall(function() setrobloxinput(true) end)
       if not bases then return nil end
 
       for _, base in ipairs(bases:GetChildren()) do
+          local owner = safe(function() return base:GetAttribute("OwnerUserId") end)
+          if tonumber(owner) == lp.UserId then
+              return base
+          end
+      end
+
+      for _, base in ipairs(bases:GetChildren()) do
           local floor = child(base, "Floor")
           local gui = floor and child(floor, "BillboardGui")
           local label = gui and child(gui, "TextLabel")
@@ -78,12 +85,15 @@ pcall(function() setrobloxinput(true) end)
           end
       end
 
-      return bases:FindFirstChild("Base5")
+      return nil
   end
 
   local function refreshBase()
-      if not state.base or not state.base.Parent then
-          state.base = getBase()
+      local current = getBase()
+      if current then
+          state.base = current
+      elseif state.base and state.base.Parent then
+          return state.base
       end
       return state.base
   end
@@ -315,9 +325,18 @@ pcall(function() setrobloxinput(true) end)
       local hrp = getHRP()
       if not hrp then return end
 
-      pcall(function()
-          hrp.CFrame = CONFIG.restCFrame
-      end)
+      local base = refreshBase()
+      local floor = base and (base:FindFirstChild("CommanderSpawnFloor") or base:FindFirstChild("Floor"))
+
+      if floor then
+          pcall(function()
+              hrp.CFrame = floor.CFrame + Vector3.new(0, 4, 0)
+          end)
+      elseif CONFIG.restCFrame then
+          pcall(function()
+              hrp.CFrame = CONFIG.restCFrame
+          end)
+      end
   end
 
   local function mergeOnePair()
