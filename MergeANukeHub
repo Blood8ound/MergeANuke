@@ -14,10 +14,10 @@ pcall(function() setrobloxinput(true) end)
       autoLock = false,
       autoMerge = false,
 
-      upgradeDelay = 20,
+      upgradeDelay = 3,
       rebirthDelay = 20,
       claimDelay = 8,
-      lockDelay = 8,
+      lockDelay = 2,
       mergeDelay = 1.5,
 
       restCFrame = nil,
@@ -69,7 +69,10 @@ pcall(function() setrobloxinput(true) end)
       if not bases then return nil end
 
       for _, base in ipairs(bases:GetChildren()) do
-          local owner = safe(function() return base:GetAttribute("OwnerUserId") end)
+          local owner = safe(function()
+              return base:GetAttribute("OwnerUserId")
+          end)
+
           if tonumber(owner) == lp.UserId then
               return base
           end
@@ -90,11 +93,13 @@ pcall(function() setrobloxinput(true) end)
 
   local function refreshBase()
       local current = getBase()
+
       if current then
           state.base = current
       elseif state.base and state.base.Parent then
           return state.base
       end
+
       return state.base
   end
 
@@ -114,8 +119,13 @@ pcall(function() setrobloxinput(true) end)
 
       if text and text ~= "" then return text end
 
-      local tier = safe(function() return nuke:GetAttribute("Tier") end)
-      if tier ~= nil then return "Tier:" .. tostring(tier) end
+      local tier = safe(function()
+          return nuke:GetAttribute("Tier")
+      end)
+
+      if tier ~= nil then
+          return "Tier:" .. tostring(tier)
+      end
 
       return nuke and nuke.Name or "Unknown"
   end
@@ -153,17 +163,16 @@ pcall(function() setrobloxinput(true) end)
   local function autoUpgrade()
       if not PurchaseUpgrade then return end
 
-      local ids = {
-          "TIER", "MAX", "LOCKBASE",
-          "Tier", "Max", "LockBase",
-          1, 2, 3
-      }
+      local ids = { "MAX", "LOCKBASE", "TIER" }
 
       for _, id in ipairs(ids) do
+          if not CONFIG.master or not CONFIG.autoUpgrade then return end
+
           pcall(function()
               PurchaseUpgrade:FireServer(id)
           end)
-          task.wait(0.08)
+
+          task.wait(0.85)
       end
   end
 
@@ -197,6 +206,7 @@ pcall(function() setrobloxinput(true) end)
               pcall(function()
                   remote:InvokeServer()
               end)
+
               task.wait(0.12)
           end
       end
@@ -500,6 +510,7 @@ pcall(function() setrobloxinput(true) end)
       main:Toggle("Auto upgrades", CONFIG.autoUpgrade, function(v)
           CONFIG.autoUpgrade = v
           state.last.upgrade = 0
+          if v then runJob("upgrade", autoUpgrade) end
       end):AddKeybind("u", "Toggle")
 
       main:Toggle("Auto rebirth", CONFIG.autoRebirth, function(v)
@@ -511,6 +522,7 @@ pcall(function() setrobloxinput(true) end)
       main:Toggle("Auto claims", CONFIG.autoClaims, function(v)
           CONFIG.autoClaims = v
           state.last.claim = 0
+          if v then runJob("claim", autoClaims) end
       end):AddKeybind("c", "Toggle")
 
       main:Toggle("Auto lock", CONFIG.autoLock, function(v)
@@ -522,9 +534,10 @@ pcall(function() setrobloxinput(true) end)
       main:Toggle("Auto merge", CONFIG.autoMerge, function(v)
           CONFIG.autoMerge = v
           state.last.merge = 0
+          if v then runJob("merge", autoMerge) end
       end):AddKeybind("n", "Toggle")
 
-      timing:Slider("Upgrade delay", CONFIG.upgradeDelay, 1, 5, 60, "s", function(v)
+      timing:Slider("Upgrade delay", CONFIG.upgradeDelay, 1, 2, 60, "s", function(v)
           CONFIG.upgradeDelay = v
       end)
 
