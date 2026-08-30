@@ -176,23 +176,35 @@ pcall(function() setrobloxinput(true) end)
       end)
   end
 
-  local NukeRemotes = ReplicatedStorage:FindFirstChild("NukeRemotes")
-  local Packages = ReplicatedStorage:FindFirstChild("Packages")
-  local Networking = Packages
-      and Packages:FindFirstChild("Remotes")
-      and Packages.Remotes:FindFirstChild("Networking")
+  local function getNukeRemotes()
+      return ReplicatedStorage:FindFirstChild("NukeRemotes")
+  end
 
-  local PurchaseUpgrade = NukeRemotes and NukeRemotes:FindFirstChild("PurchaseUpgrade")
-  local RequestRebirth = NukeRemotes and NukeRemotes:FindFirstChild("RequestRebirth")
-  local RequestLockBase = NukeRemotes and NukeRemotes:FindFirstChild("RequestLockBase")
-  local DropRemote1 = NukeRemotes and NukeRemotes:FindFirstChild("Drop")
-  local DropRemote2 = Networking and Networking:FindFirstChild("RE/Pickup/Drop")
+  local function getNetworking()
+      local packages = ReplicatedStorage:FindFirstChild("Packages")
+      local remotes = packages and packages:FindFirstChild("Remotes")
+      return remotes and remotes:FindFirstChild("Networking")
+  end
 
-  local ClaimAllSeasonQuests = Networking and Networking:FindFirstChild("RF/ClaimAllSeasonQuests")
-  local ClaimSeasonLogin = Networking and Networking:FindFirstChild("RF/ClaimSeasonLogin")
-  local ClaimSeasonPass = Networking and Networking:FindFirstChild("RF/ClaimSeasonPass")
+  local function getNukeRemote(name)
+      local remotes = getNukeRemotes()
+      return remotes and remotes:FindFirstChild(name)
+  end
+
+  local function getNetworkRemote(...)
+      local networking = getNetworking()
+      if not networking then return nil end
+
+      for i = 1, select("#", ...) do
+          local remote = networking:FindFirstChild(select(i, ...))
+          if remote then return remote end
+      end
+
+      return nil
+  end
 
   local function autoUpgrade()
+      local PurchaseUpgrade = getNukeRemote("PurchaseUpgrade")
       if not PurchaseUpgrade then return end
 
       local ids = { "MAX", "LOCKBASE", "TIER" }
@@ -209,6 +221,7 @@ pcall(function() setrobloxinput(true) end)
   end
 
   local function autoRebirth()
+      local RequestRebirth = getNukeRemote("RequestRebirth")
       if not RequestRebirth then return end
 
       pcall(function()
@@ -230,9 +243,9 @@ pcall(function() setrobloxinput(true) end)
 
   local function autoClaims()
       for _, remote in ipairs({
-          ClaimAllSeasonQuests,
-          ClaimSeasonLogin,
-          ClaimSeasonPass
+          getNetworkRemote("RF/ClaimAllSeasonQuests", "RF/Season/ClaimAllSeasonQuests"),
+          getNetworkRemote("RF/ClaimSeasonLogin", "RF/Season/ClaimSeasonLogin"),
+          getNetworkRemote("RF/ClaimSeasonPass", "RF/Season/ClaimSeasonPass")
       }) do
           if remote then
               pcall(function()
@@ -245,6 +258,7 @@ pcall(function() setrobloxinput(true) end)
   end
 
   local function autoLock()
+      local RequestLockBase = getNukeRemote("RequestLockBase")
       if RequestLockBase then
           pcall(function()
               RequestLockBase:FireServer()
@@ -253,6 +267,9 @@ pcall(function() setrobloxinput(true) end)
   end
 
   local function dropHeldNuke()
+      local DropRemote1 = getNukeRemote("Drop")
+      local DropRemote2 = getNetworkRemote("RE/Pickup/Drop")
+
       pcall(function()
           if DropRemote1 then DropRemote1:FireServer() end
       end)
