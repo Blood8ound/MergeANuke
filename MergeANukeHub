@@ -283,22 +283,16 @@ pcall(function() setrobloxinput(true) end)
       local PurchaseUpgrade = getNukeRemote("PurchaseUpgrade")
       if not PurchaseUpgrade then return end
 
-      local cashValue = getCashValue()
       local upgrades = {
-          { id = "TIER", row = "Tier", price = getUpgradePrice("Tier") },
-          { id = "MAX", row = "Max", price = getUpgradePrice("Max") },
-          { id = "LOCKBASE", row = "LockBase", price = getUpgradePrice("LockBase") }
+          { id = "TIER", row = "Tier" },
+          { id = "MAX", row = "Max" },
+          { id = "LOCKBASE", row = "LockBase" }
       }
 
-      table.sort(upgrades, function(a, b)
-          return (a.price or math.huge) < (b.price or math.huge)
-      end)
-
+      -- The upgrade UI is lazy-loaded after rejoin. Do not require its price labels.
+      -- The server owns affordability; try each endpoint and wait for its row to change.
       for _, upgrade in ipairs(upgrades) do
           if not CONFIG.master or not CONFIG.autoUpgrade then return end
-          if not upgrade.price or (cashValue and upgrade.price > cashValue) then
-              continue
-          end
 
           local before = getUpgradeRowText(upgrade.row)
 
@@ -306,10 +300,9 @@ pcall(function() setrobloxinput(true) end)
               PurchaseUpgrade:FireServer(upgrade.id, "cash")
           end)
 
-          if waitForUpgradeChange(upgrade.row, before, 5) then
-              cashValue = getCashValue() or cashValue
-          else
-              task.wait(0.5)
+          if waitForUpgradeChange(upgrade.row, before, 2) then
+              task.wait(0.25)
+              return
           end
 
           task.wait(0.25)
