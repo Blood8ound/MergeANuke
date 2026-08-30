@@ -88,6 +88,32 @@ pcall(function() setrobloxinput(true) end)
           end
       end
 
+      local hrp = getHRP()
+      local positions = Workspace:FindFirstChild("BasePosition")
+      local nearestBase, nearestDistance
+
+      if hrp and positions then
+          for _, marker in ipairs(positions:GetChildren()) do
+              local base = bases:FindFirstChild(marker.Name)
+              local markerPos = safe(function()
+                  return marker.Position
+              end)
+
+              if base and markerPos then
+                  local distance = (hrp.Position - markerPos).Magnitude
+
+                  if not nearestDistance or distance < nearestDistance then
+                      nearestBase = base
+                      nearestDistance = distance
+                  end
+              end
+          end
+      end
+
+      if nearestBase and nearestDistance and nearestDistance <= 90 then
+          return nearestBase
+      end
+
       return nil
   end
 
